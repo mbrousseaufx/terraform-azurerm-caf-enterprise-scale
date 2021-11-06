@@ -101,23 +101,22 @@ locals {
   deploy_private_dns_zone_virtual_network_link_on_spokes = local.deploy_dns && local.settings.dns.config.enable_private_dns_zone_virtual_network_link_on_spokes
 }
 
+
 # Configuration settings for resource type:
 #  - azurerm_resource_group
 locals {
   # Determine the name of each Resource Group per scope and location
   resource_group_names_by_scope_and_location = {
     connectivity = {
-      for location in local.hub_network_locations :
-      location =>
-      try(local.custom_settings.azurerm_resource_group["connectivity"][location].name,
-      "${local.resource_prefix}-connectivity-${location}${local.resource_suffix}")
+      for location, hub in local.hub_networks_by_location :
+      location => coalesce(hub.config.resource_group_name, "${local.resource_prefix}-connectivity-${location}${local.resource_suffix}")
     }
     ddos = {
-      (local.ddos_location) = try(local.custom_settings.azurerm_resource_group["ddos"][local.ddos_location].name,
+      (local.ddos_location) = coalesce(local.settings.ddos_protection_plan.config.resource_group_name,
       "${local.resource_prefix}-ddos${local.resource_suffix}")
     }
     dns = {
-      (local.dns_location) = try(local.custom_settings.azurerm_resource_group["dns"][local.dns_location].name,
+      (local.dns_location) = coalesce(local.settings.dns.config.resource_group_name,
       "${local.resource_prefix}-dns${local.resource_suffix}")
     }
   }
@@ -151,7 +150,7 @@ locals {
 # #  - azurerm_network_ddos_protection_plan
 locals {
   ddos_resource_group_id = local.resource_group_config_by_scope_and_location["ddos"][local.ddos_location].resource_id
-  ddos_protection_plan_name = try(local.custom_settings.azurerm_network_ddos_protection_plan["ddos"][local.ddos_location].name,
+  ddos_protection_plan_name = coalesce(local.settings.ddos_protection_plan.config.name,
   "${local.resource_prefix}-ddos-${local.ddos_location}${local.resource_suffix}")
   ddos_protection_plan_resource_id = coalesce(
     local.existing_ddos_protection_plan_resource_id,
@@ -166,7 +165,7 @@ locals {
       name                = local.ddos_protection_plan_name
       location            = local.ddos_location
       resource_group_name = local.resource_group_config_by_scope_and_location["ddos"][local.ddos_location].name
-      tags                = try(local.custom_settings.azurerm_network_ddos_protection_plan["ddos"][local.ddos_location].tags, local.tags)
+      tags                = coalesce(local.settings.ddos_protection_plan.config.tags, local.tags)
     }
   ]
 }
@@ -207,7 +206,7 @@ locals {
       location            = location
       bgp_community       = hub_config.config.bgp_community != local.empty_string ? hub_config.config.bgp_community : null
       dns_servers         = hub_config.config.dns_servers
-      tags                = try(local.custom_settings.azurerm_virtual_network["connectivity"][location].tags, local.tags)
+      tags                = coalesce(hub_config.config.tags, local.tags)
       ddos_protection_plan = hub_config.config.link_to_ddos_protection_plan ? [
         {
           id     = local.ddos_protection_plan_resource_id
@@ -235,11 +234,11 @@ locals {
             # Resource definition attributes
             resource_group_name                            = local.resource_group_names_by_scope_and_location["connectivity"][location]
             virtual_network_name                           = local.virtual_network_name[location]
-            enforce_private_link_endpoint_network_policies = try(local.custom_settings.azurerm_subnet["connectivity"][location][subnet.name].enforce_private_link_endpoint_network_policies, null)
-            enforce_private_link_service_network_policies  = try(local.custom_settings.azurerm_subnet["connectivity"][location][subnet.name].enforce_private_link_service_network_policies, null)
-            service_endpoints                              = try(local.custom_settings.azurerm_subnet["connectivity"][location][subnet.name].service_endpoints, null)
-            service_endpoint_policy_ids                    = try(local.custom_settings.azurerm_subnet["connectivity"][location][subnet.name].service_endpoint_policy_ids, null)
-            delegation                                     = try(local.custom_settings.azurerm_subnet["connectivity"][location][subnet.name].delegation, local.empty_list)
+            enforce_private_link_endpoint_network_policies = subnet.enforce_private_link_endpoint_network_policies
+            enforce_private_link_service_network_policies  = subnet.enforce_private_link_service_network_policies
+            service_endpoints                              = subnet.service_endpoints
+            service_endpoint_policy_ids                    = subnet.service_endpoint_policy_ids
+            delegation                                     = coalesce(subnet.delegation, [])
           }
         )
       ],
@@ -256,11 +255,11 @@ locals {
           address_prefixes                               = [hub_network.config.virtual_network_gateway.config.address_prefix, ]
           resource_group_name                            = local.resource_group_names_by_scope_and_location["connectivity"][location]
           virtual_network_name                           = local.virtual_network_name[location]
-          enforce_private_link_endpoint_network_policies = try(local.custom_settings.azurerm_subnet["connectivity"][location]["GatewaySubnet"].enforce_private_link_endpoint_network_policies, null)
-          enforce_private_link_service_network_policies  = try(local.custom_settings.azurerm_subnet["connectivity"][location]["GatewaySubnet"].enforce_private_link_service_network_policies, null)
-          service_endpoints                              = try(local.custom_settings.azurerm_subnet["connectivity"][location]["GatewaySubnet"].service_endpoints, null)
-          service_endpoint_policy_ids                    = try(local.custom_settings.azurerm_subnet["connectivity"][location]["GatewaySubnet"].service_endpoint_policy_ids, null)
-          delegation                                     = try(local.custom_settings.azurerm_subnet["connectivity"][location]["GatewaySubnet"].delegation, local.empty_list)
+          enforce_private_link_endpoint_network_policies = hub_network.config.virtual_network_gateway.config.enforce_private_link_endpoint_network_policies
+          enforce_private_link_service_network_policies  = hub_network.config.virtual_network_gateway.config.enforce_private_link_service_network_policies
+          service_endpoints                              = hub_network.config.virtual_network_gateway.config.service_endpoints
+          service_endpoint_policy_ids                    = hub_network.config.virtual_network_gateway.config.service_endpoint_policy_ids
+          delegation                                     = coalesce(hub_network.config.virtual_network_gateway.config.delegation, [])
         }
       ] : local.empty_list,
       # Conditionally add Azure Firewall subnet
@@ -276,11 +275,11 @@ locals {
           address_prefixes                               = [hub_network.config.azure_firewall.config.address_prefix, ]
           resource_group_name                            = local.resource_group_names_by_scope_and_location["connectivity"][location]
           virtual_network_name                           = local.virtual_network_name[location]
-          enforce_private_link_endpoint_network_policies = try(local.custom_settings.azurerm_subnet["connectivity"][location]["AzureFirewallSubnet"].enforce_private_link_endpoint_network_policies, null)
-          enforce_private_link_service_network_policies  = try(local.custom_settings.azurerm_subnet["connectivity"][location]["AzureFirewallSubnet"].enforce_private_link_service_network_policies, null)
-          service_endpoints                              = try(local.custom_settings.azurerm_subnet["connectivity"][location]["AzureFirewallSubnet"].service_endpoints, null)
-          service_endpoint_policy_ids                    = try(local.custom_settings.azurerm_subnet["connectivity"][location]["AzureFirewallSubnet"].service_endpoint_policy_ids, null)
-          delegation                                     = try(local.custom_settings.azurerm_subnet["connectivity"][location]["AzureFirewallSubnet"].delegation, local.empty_list)
+          enforce_private_link_endpoint_network_policies = hub_network.config.azure_firewall.config.enforce_private_link_endpoint_network_policies
+          enforce_private_link_service_network_policies  = hub_network.config.azure_firewall.config.enforce_private_link_service_network_policies
+          service_endpoints                              = hub_network.config.azure_firewall.config.service_endpoints
+          service_endpoint_policy_ids                    = hub_network.config.azure_firewall.config.service_endpoint_policy_ids
+          delegation                                     = coalesce(hub_network.config.azure_firewall.config.delegation, [])
         }
       ] : local.empty_list,
     )
@@ -310,14 +309,13 @@ locals {
     location =>
     "${local.er_gateway_resource_id_prefix[location]}/${local.er_gateway_name[location]}"
   }
-  er_gateway_config = [
+  er_gateway_config = [for g in [
     for location, hub_network in local.hub_networks_by_location :
     {
       # Resource logic attributes
-      resource_id       = local.er_gateway_resource_id[location]
       managed_by_module = local.deploy_virtual_network_gateway_expressroute[location]
       # Resource definition attributes
-      name                = local.er_gateway_name[location]
+      name                = coalesce(hub_network.config.virtual_network_gateway.config.name, "${local.resource_prefix}-ergw-${location}${local.resource_suffix}")
       resource_group_name = local.resource_group_names_by_scope_and_location["connectivity"][location]
       location            = location
       type                = "ExpressRoute"
@@ -334,16 +332,16 @@ locals {
           }
         ]
       )
-      vpn_type                         = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["ergw"][location].vpn_type, "RouteBased")
-      enable_bgp                       = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["ergw"][location].enable_bgp, true)
-      active_active                    = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["ergw"][location].active_active, false)
-      private_ip_address_enabled       = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["ergw"][location].private_ip_address_enabled, null)
-      default_local_network_gateway_id = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["ergw"][location].default_local_network_gateway_id, null)
-      generation                       = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["ergw"][location].generation, null)
-      vpn_client_configuration         = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["ergw"][location].vpn_client_configuration, local.empty_list)
-      bgp_settings                     = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["ergw"][location].bgp_settings, local.empty_list)
-      custom_route                     = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["ergw"][location].custom_route, local.empty_list)
-      tags                             = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["ergw"][location].tags, local.tags)
+      vpn_type                         = coalesce(hub_network.config.virtual_network_gateway.config.expressroute_vpn_type, "RouteBased")
+      enable_bgp                       = coalesce(hub_network.config.virtual_network_gateway.config.expressroute_enable_bgp, true)
+      active_active                    = coalesce(hub_network.config.virtual_network_gateway.config.expressroute_active_active, false)
+      private_ip_address_enabled       = hub_network.config.virtual_network_gateway.config.expressroute_private_ip_address_enabled
+      default_local_network_gateway_id = hub_network.config.virtual_network_gateway.config.expressroute_default_local_network_gateway_id
+      generation                       = hub_network.config.virtual_network_gateway.config.expressroute_generation
+      vpn_client_configuration         = coalesce(hub_network.config.virtual_network_gateway.config.expressroute_vpn_client_configuration, [])
+      bgp_settings                     = coalesce(hub_network.config.virtual_network_gateway.config.expressroute_bgp_settings, [])
+      custom_route                     = coalesce(hub_network.config.virtual_network_gateway.config.expressroute_custom_route, [])
+      tags                             = coalesce(hub_network.config.virtual_network_gateway.config.expressroute_tags, local.tags)
       # Child resource definition attributes
       azurerm_public_ip = {
         # Resource logic attributes
@@ -353,24 +351,28 @@ locals {
         name                    = "${local.er_gateway_name[location]}-pip"
         resource_group_name     = local.resource_group_names_by_scope_and_location["connectivity"][location]
         location                = location
-        sku                     = try(local.custom_settings.azurerm_public_ip["connectivity"]["ergw"][location].sku, "Standard")
-        ip_version              = try(local.custom_settings.azurerm_public_ip["connectivity"]["ergw"][location].ip_version, null)
-        idle_timeout_in_minutes = try(local.custom_settings.azurerm_public_ip["connectivity"]["ergw"][location].idle_timeout_in_minutes, null)
-        domain_name_label       = try(local.custom_settings.azurerm_public_ip["connectivity"]["ergw"][location].domain_name_label, null)
-        reverse_fqdn            = try(local.custom_settings.azurerm_public_ip["connectivity"]["ergw"][location].reverse_fqdn, null)
-        public_ip_prefix_id     = try(local.custom_settings.azurerm_public_ip["connectivity"]["ergw"][location].public_ip_prefix_id, null)
-        ip_tags                 = try(local.custom_settings.azurerm_public_ip["connectivity"]["ergw"][location].ip_tags, null)
-        tags                    = try(local.custom_settings.azurerm_public_ip["connectivity"]["ergw"][location].tags, local.tags)
-        allocation_method = try(
-          local.custom_settings.azurerm_public_ip["connectivity"]["ergw"][location].allocation_method,
+        sku                     = coalesce(hub_network.config.virtual_network_gateway.config.expressroute_public_ip_sku, "Standard")
+        ip_version              = hub_network.config.virtual_network_gateway.config.expressroute_public_ip_ip_version
+        idle_timeout_in_minutes = hub_network.config.virtual_network_gateway.config.expressroute_public_ip_idle_timeout_in_minutes
+        domain_name_label       = hub_network.config.virtual_network_gateway.config.expressroute_public_ip_domain_name_label
+        reverse_fqdn            = hub_network.config.virtual_network_gateway.config.expressroute_public_ip_reverse_fqdn
+        public_ip_prefix_id     = hub_network.config.virtual_network_gateway.config.expressroute_public_ip_public_ip_prefix_id
+        ip_tags                 = hub_network.config.virtual_network_gateway.config.expressroute_public_ip_ip_tags
+        tags                    = coalesce(hub_network.config.virtual_network_gateway.config.expressroute_public_ip_tags, local.tags)
+        allocation_method = coalesce(
+          hub_network.config.virtual_network_gateway.config.expressroute_public_ip_allocation_method,
           try(local.custom_settings.azurerm_public_ip["connectivity"]["ergw"][location].sku, "Standard") == "Standard" ? "Static" : "Dynamic"
         )
-        availability_zone = try(
-          local.custom_settings.azurerm_public_ip["connectivity"]["ergw"][location].availability_zone,
+        availability_zone = coalesce(
+          hub_network.config.virtual_network_gateway.config.expressroute_public_ip_availability_zone,
           length(regexall("AZ$", hub_network.config.virtual_network_gateway.config.gateway_sku_expressroute)) > 0 ? "Zone-Redundant" : "No-Zone"
         )
       }
     }
+    ] : merge(g, {
+
+      resource_id = "/subscriptions/${local.subscription_id}/${g.resource_group_name}/providers/Microsoft.Network/virtualNetworkGateways/${g.name}"
+    })
   ]
 }
 
@@ -417,16 +419,16 @@ locals {
           }
         ]
       )
-      vpn_type                         = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["vpngw"][location].vpn_type, "RouteBased")
-      enable_bgp                       = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["vpngw"][location].enable_bgp, false)
-      active_active                    = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["vpngw"][location].active_active, false)
-      private_ip_address_enabled       = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["vpngw"][location].private_ip_address_enabled, null)
-      default_local_network_gateway_id = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["vpngw"][location].default_local_network_gateway_id, null)
-      generation                       = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["vpngw"][location].generation, null)
-      vpn_client_configuration         = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["vpngw"][location].vpn_client_configuration, local.empty_list)
-      bgp_settings                     = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["vpngw"][location].bgp_settings, local.empty_list)
-      custom_route                     = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["vpngw"][location].custom_route, local.empty_list)
-      tags                             = try(local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["vpngw"][location].tags, local.tags)
+      vpn_type                         = coalesce(hub_network.config.virtual_network_gateway.config.vpn_type, "RouteBased")
+      enable_bgp                       = coalesce(hub_network.config.virtual_network_gateway.config.enable_bgp, false)
+      active_active                    = coalesce(hub_network.config.virtual_network_gateway.config.active_active, false)
+      private_ip_address_enabled       = hub_network.config.virtual_network_gateway.config.private_ip_address_enabled
+      default_local_network_gateway_id = hub_network.config.virtual_network_gateway.config.default_local_network_gateway_id
+      generation                       = hub_network.config.virtual_network_gateway.config.generation
+      vpn_client_configuration         = coalesce(hub_network.config.virtual_network_gateway.config.vpn_client_configuration, [])
+      bgp_settings                     = coalesce(hub_network.config.virtual_network_gateway.config.bgp_settings, [])
+      custom_route                     = coalesce(hub_network.config.virtual_network_gateway.config.custom_route, [])
+      tags                             = coalesce(hub_network.config.virtual_network_gateway.config.tags, local.tags)
       # Child resource definition attributes
       azurerm_public_ip = {
         # Resource logic attributes
@@ -436,23 +438,23 @@ locals {
         name                    = "${local.vpn_gateway_name[location]}-pip"
         resource_group_name     = local.resource_group_names_by_scope_and_location["connectivity"][location]
         location                = location
-        ip_version              = try(local.custom_settings.azurerm_public_ip["connectivity"]["vpngw"][location].ip_version, null)
-        idle_timeout_in_minutes = try(local.custom_settings.azurerm_public_ip["connectivity"]["vpngw"][location].idle_timeout_in_minutes, null)
-        domain_name_label       = try(local.custom_settings.azurerm_public_ip["connectivity"]["vpngw"][location].domain_name_label, null)
-        reverse_fqdn            = try(local.custom_settings.azurerm_public_ip["connectivity"]["vpngw"][location].reverse_fqdn, null)
-        public_ip_prefix_id     = try(local.custom_settings.azurerm_public_ip["connectivity"]["vpngw"][location].public_ip_prefix_id, null)
-        ip_tags                 = try(local.custom_settings.azurerm_public_ip["connectivity"]["vpngw"][location].ip_tags, null)
-        tags                    = try(local.custom_settings.azurerm_public_ip["connectivity"]["vpngw"][location].tags, local.tags)
+        ip_version              = hub_network.config.virtual_network_gateway.config.public_ip_ip_version
+        idle_timeout_in_minutes = hub_network.config.virtual_network_gateway.config.public_ip_idle_timeout_in_minutes
+        domain_name_label       = hub_network.config.virtual_network_gateway.config.public_ip_domain_name_label
+        reverse_fqdn            = hub_network.config.virtual_network_gateway.config.public_ip_reverse_fqdn
+        public_ip_prefix_id     = hub_network.config.virtual_network_gateway.config.public_ip_public_ip_prefix_id
+        ip_tags                 = coalesce(hub_network.config.virtual_network_gateway.config.public_ip_ip_tags, {})
+        tags                    = coalesce(hub_network.config.virtual_network_gateway.config.public_ip_tags, local.tags)
         sku = try(
-          local.custom_settings.azurerm_public_ip["connectivity"]["vpngw"][location].sku,
+          hub_network.config.virtual_network_gateway.configpublic_ip_sku,
           length(regexall("AZ$", hub_network.config.virtual_network_gateway.config.gateway_sku_vpn)) > 0 ? "Standard" : "Basic"
         )
         allocation_method = try(
-          local.custom_settings.azurerm_public_ip["connectivity"]["vpngw"][location].allocation_method,
+          hub_network.config.virtual_network_gateway.configpublic_ip_allocation_method,
           length(regexall("AZ$", hub_network.config.virtual_network_gateway.config.gateway_sku_vpn)) > 0 ? "Static" : "Dynamic"
         )
         availability_zone = try(
-          local.custom_settings.azurerm_public_ip["connectivity"]["vpngw"][location].availability_zone,
+          hub_network.config.virtual_network_gateway.configpublic_ip_availability_zone,
           length(regexall("AZ$", hub_network.config.virtual_network_gateway.config.gateway_sku_vpn)) > 0 ? "Zone-Redundant" : "No-Zone"
         )
       }
@@ -511,7 +513,7 @@ locals {
       # Resource definition attributes
       name                = local.azfw_name[location]
       resource_group_name = local.resource_group_names_by_scope_and_location["connectivity"][location]
-      location            = location
+      location            = hub_network.config.location
       ip_configuration = try(
         local.custom_settings.azurerm_firewall["connectivity"][location].ip_configuration,
         [
@@ -522,16 +524,16 @@ locals {
           }
         ]
       )
-      sku_name                    = try(local.custom_settings.azurerm_firewall["connectivity"][location].sku_name, "AZFW_VNet")
-      sku_tier                    = try(local.custom_settings.azurerm_firewall["connectivity"][location].sku_tier, "Standard")
-      firewall_policy_id          = try(local.custom_settings.azurerm_firewall["connectivity"][location].firewall_policy_id, null)
-      dns_servers                 = try(local.custom_settings.azurerm_firewall["connectivity"][location].dns_servers, null)
-      private_ip_ranges           = try(local.custom_settings.azurerm_firewall["connectivity"][location].private_ip_ranges, null)
-      management_ip_configuration = try(local.custom_settings.azurerm_firewall["connectivity"][location].management_ip_configuration, local.empty_list)
-      threat_intel_mode           = try(local.custom_settings.azurerm_firewall["connectivity"][location].threat_intel_mode, null)
-      virtual_hub                 = try(local.custom_settings.azurerm_firewall["connectivity"][location].virtual_hub, local.empty_list)
-      zones                       = try(local.custom_settings.azurerm_firewall["connectivity"][location].zones, local.azfw_zones[location])
-      tags                        = try(local.custom_settings.azurerm_firewall["connectivity"][location].tags, local.tags)
+      sku_name                    = coalesce(hub_network.config.azure_firewall.config.sku_name, "AZFW_VNet")
+      sku_tier                    = coalesce(hub_network.config.azure_firewall.config.sku_tier, "Standard")
+      firewall_policy_id          = hub_network.config.azure_firewall.config.firewall_policy_id
+      dns_servers                 = hub_network.config.azure_firewall.config.dns_servers
+      private_ip_ranges           = hub_network.config.azure_firewall.config.private_ip_ranges
+      management_ip_configuration = coalesce(hub_network.config.azure_firewall.config.management_ip_configuration, [])
+      threat_intel_mode           = hub_network.config.azure_firewall.config.threat_intel_mode
+      virtual_hub                 = coalesce(hub_network.config.azure_firewall.config.virtual_hub, [])
+      zones                       = coalesce(hub_network.config.azure_firewall.config.zones, local.azfw_zones[location])
+      tags                        = coalesce(hub_network.config.azure_firewall.config.tags, local.tags)
       # Child resource definition attributes
       azurerm_public_ip = {
         # Resource logic attributes
@@ -541,15 +543,15 @@ locals {
         name                    = "${local.azfw_name[location]}-pip"
         resource_group_name     = local.resource_group_names_by_scope_and_location["connectivity"][location]
         location                = location
-        sku                     = try(local.custom_settings.azurerm_public_ip["connectivity"]["azfw"][location].sku, "Standard")
-        allocation_method       = try(local.custom_settings.azurerm_public_ip["connectivity"]["azfw"][location].allocation_method, "Static")
-        ip_version              = try(local.custom_settings.azurerm_public_ip["connectivity"]["azfw"][location].ip_version, null)
-        idle_timeout_in_minutes = try(local.custom_settings.azurerm_public_ip["connectivity"]["azfw"][location].idle_timeout_in_minutes, null)
-        domain_name_label       = try(local.custom_settings.azurerm_public_ip["connectivity"]["azfw"][location].domain_name_label, null)
-        reverse_fqdn            = try(local.custom_settings.azurerm_public_ip["connectivity"]["azfw"][location].reverse_fqdn, null)
-        public_ip_prefix_id     = try(local.custom_settings.azurerm_public_ip["connectivity"]["azfw"][location].public_ip_prefix_id, null)
-        ip_tags                 = try(local.custom_settings.azurerm_public_ip["connectivity"]["azfw"][location].ip_tags, null)
-        tags                    = try(local.custom_settings.azurerm_public_ip["connectivity"]["azfw"][location].tags, local.tags)
+        sku                     = coalesce(hub_network.config.azure_firewall.config.public_ip_sku, "Standard")
+        allocation_method       = coalesce(hub_network.config.azure_firewall.config.public_ip_allocation_method, "Static")
+        ip_version              = hub_network.config.azure_firewall.config.public_ip_ip_version
+        idle_timeout_in_minutes = hub_network.config.azure_firewall.config.public_ip_idle_timeout_in_minutes
+        domain_name_label       = hub_network.config.azure_firewall.config.public_ip_domain_name_label
+        reverse_fqdn            = hub_network.config.azure_firewall.config.public_ip_reverse_fqdn
+        public_ip_prefix_id     = hub_network.config.azure_firewall.config.public_ip_public_ip_prefix_id
+        ip_tags                 = coalesce(hub_network.config.azure_firewall.config.public_ip_ip_tags, {})
+        tags                    = coalesce(hub_network.config.azure_firewall.config.public_ip_tags, local.tags)
         availability_zone = try(
           local.custom_settings.azurerm_public_ip["connectivity"]["azfw"][location].availability_zone,
           local.azfw_zones_enabled[location] ? "Zone-Redundant" : "No-Zone"
@@ -688,12 +690,12 @@ locals {
         # Resource definition attributes
         name = fqdn
         resource_group_name = try(
-          local.custom_settings.azurerm_private_dns_zone["connectivity"][fqdn]["global"].resource_group_name,
+          local.settings.dns.config.fqdn[fqdn].resource_group_name,
           local.resource_group_names_by_scope_and_location["dns"][local.dns_location]
         )
         # Optional definition attributes
-        soa_record = try(local.custom_settings.azurerm_private_dns_zone["connectivity"][fqdn]["global"].soa_record, local.empty_list)
-        tags       = try(local.custom_settings.azurerm_private_dns_zone["connectivity"][fqdn]["global"].tags, local.tags)
+        soa_record = try(local.settings.dns.config.fqdn[fqdn].soa_record, [])
+        tags       = try(local.settings.dns.config.fqdn[fqdn].tags, local.tags)
       }
     ],
     [
@@ -705,12 +707,12 @@ locals {
         # Resource definition attributes
         name = fqdn
         resource_group_name = try(
-          local.custom_settings.azurerm_private_dns_zone["connectivity"][fqdn]["global"].resource_group_name,
+          local.settings.dns.config.fqdn[fqdn].resource_group_name,
           local.resource_group_names_by_scope_and_location["dns"][local.dns_location]
         )
         # Optional definition attributes
-        soa_record = try(local.custom_settings.azurerm_private_dns_zone["connectivity"][fqdn]["global"].soa_record, local.empty_list)
-        tags       = try(local.custom_settings.azurerm_private_dns_zone["connectivity"][fqdn]["global"].tags, local.tags)
+        soa_record = try(local.settings.dns.config.fqdn[fqdn].soa_record, [])
+        tags       = try(local.settings.dns.config.fqdn[fqdn].tags, local.tags)
       }
     ],
   )
@@ -728,12 +730,12 @@ locals {
       # Resource definition attributes
       name = fqdn
       resource_group_name = try(
-        local.custom_settings.azurerm_private_dns_zone["connectivity"][fqdn]["global"].resource_group_name,
+        local.settings.dns.config.fqdn[fqdn].resource_group_name,
         local.resource_group_names_by_scope_and_location["dns"][local.dns_location]
       )
       # Optional definition attributes
-      soa_record = try(local.custom_settings.azurerm_dns_zone["connectivity"][fqdn]["global"].soa_record, local.empty_list)
-      tags       = try(local.custom_settings.azurerm_dns_zone["connectivity"][fqdn]["global"].tags, local.tags)
+      soa_record = try(local.settings.dns.config.fqdn[fqdn].soa_record, [])
+      tags       = try(local.settings.dns.config.fqdn[fqdn].tags, local.tags)
     }
   ]
 }
