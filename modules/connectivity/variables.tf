@@ -91,6 +91,12 @@ variable "settings" {
               custom_route                                   = optional(list(string))
               tags                                           = optional(map(string))
 
+              ip_configuration = optional(list(object({
+                name                 = string
+                public_ip_address_id = string
+                subnet_id            = string
+              })))
+
               public_ip_sku                     = optional(string)
               public_ip_allocation_method       = optional(string)
               public_ip_availability_zone       = optional(string)
@@ -136,6 +142,12 @@ variable "settings" {
                 zone_3 = bool
               })
 
+              ip_configuration = optional(list(object({
+                name                 = string
+                public_ip_address_id = string
+                subnet_id            = string
+              })))
+
               name                        = optional(string)
               sku_name                    = optional(string)
               sku_tier                    = optional(string)
@@ -156,6 +168,7 @@ variable "settings" {
 
               public_ip_sku                     = optional(string)
               public_ip_allocation_method       = optional(string)
+              public_ip_availability_zone       = optional(string)
               public_ip_ip_version              = optional(string)
               public_ip_idle_timeout_in_minutes = optional(string)
               public_ip_domain_name_label       = optional(string)

@@ -173,34 +173,16 @@ locals {
 # Configuration settings for resource type:
 #  - azurerm_virtual_network
 locals {
-  virtual_network_name = {
-    for location in local.hub_network_locations :
-    location =>
-    try(local.custom_settings.azurerm_virtual_network["connectivity"][location].name,
-    "${local.resource_prefix}-hub-${location}${local.resource_suffix}")
-  }
   virtual_network_resource_group_id = {
     for location in local.hub_network_locations :
     location =>
     local.resource_group_config_by_scope_and_location["connectivity"][location].resource_id
   }
-  virtual_network_resource_id_prefix = {
-    for location in local.hub_network_locations :
-    location =>
-    "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/virtualNetworks"
-  }
-  virtual_network_resource_id = {
-    for location in local.hub_network_locations :
-    location =>
-    "${local.virtual_network_resource_id_prefix[location]}/${local.virtual_network_name[location]}"
-  }
-  azurerm_virtual_network = [
+  azurerm_virtual_network = [for h in [
     for location, hub_config in local.hub_networks_by_location :
     {
-      # Resource logic attributes
-      resource_id = local.virtual_network_resource_id[location]
       # Resource definition attributes
-      name                = local.virtual_network_name[location]
+      name                = coalesce(hub_config.config.virtual_network_name, "${local.resource_prefix}-hub-${location}${local.resource_suffix}")
       resource_group_name = local.resource_group_names_by_scope_and_location["connectivity"][location]
       address_space       = hub_config.config.address_space
       location            = location
@@ -214,7 +196,22 @@ locals {
         }
       ] : local.empty_list
     }
+    ] :
+    merge(h,
+      {
+        # Resource logic attributes
+        resource_id = "${local.virtual_network_resource_group_id[h.location]}/providers/Microsoft.Network/virtualNetworks/${h.name}"
+      }
+    )
   ]
+  virtual_network_name = {
+    for v in local.azurerm_virtual_network :
+    v.location => v.name
+  }
+  virtual_network_resource_id = {
+    for v in local.azurerm_virtual_network :
+    v.location => v.resource_id
+  }
 }
 
 # Configuration settings for resource type:
@@ -293,29 +290,20 @@ locals {
 # Configuration settings for resource type:
 #  - azurerm_virtual_network_gateway (ExpressRoute)
 locals {
+
+
   er_gateway_name = {
-    for location in local.hub_network_locations :
-    location =>
-    try(local.custom_settings.azurerm_virtual_network_gateway["expressroute"][location].name,
-    "${local.resource_prefix}-ergw-${location}${local.resource_suffix}")
+    for location, hub_network in local.hub_networks_by_location :
+    location => coalesce(hub_network.config.virtual_network_gateway.config.name, "${local.resource_prefix}-ergw-${location}${local.resource_suffix}")
   }
-  er_gateway_resource_id_prefix = {
-    for location in local.hub_network_locations :
-    location =>
-    "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/virtualNetworkGateways"
-  }
-  er_gateway_resource_id = {
-    for location in local.hub_network_locations :
-    location =>
-    "${local.er_gateway_resource_id_prefix[location]}/${local.er_gateway_name[location]}"
-  }
+
   er_gateway_config = [for g in [
     for location, hub_network in local.hub_networks_by_location :
     {
       # Resource logic attributes
       managed_by_module = local.deploy_virtual_network_gateway_expressroute[location]
       # Resource definition attributes
-      name                = coalesce(hub_network.config.virtual_network_gateway.config.name, "${local.resource_prefix}-ergw-${location}${local.resource_suffix}")
+      name                = local.er_gateway_name[location]
       resource_group_name = local.resource_group_names_by_scope_and_location["connectivity"][location]
       location            = location
       type                = "ExpressRoute"
@@ -370,36 +358,27 @@ locals {
       }
     }
     ] : merge(g, {
-
       resource_id = "/subscriptions/${local.subscription_id}/${g.resource_group_name}/providers/Microsoft.Network/virtualNetworkGateways/${g.name}"
     })
   ]
+  er_gateway_resource_id = {
+    for g in local.er_gateway_config :
+    g.location => g.resource_id
+  }
 }
 
 # Configuration settings for resource type:
 #  - azurerm_virtual_network_gateway (VPN)
 locals {
   vpn_gateway_name = {
-    for location in local.hub_network_locations :
-    location =>
-    try(local.custom_settings.azurerm_virtual_network_gateway["vpn"][location].name,
-    "${local.resource_prefix}-vpngw-${location}${local.resource_suffix}")
+    for location, hub_network in local.hub_networks_by_location :
+    location => coalesce(hub_network.config.virtual_network_gateway.config.name, "${local.resource_prefix}-vpngw-${location}${local.resource_suffix}")
   }
-  vpn_gateway_resource_id_prefix = {
-    for location in local.hub_network_locations :
-    location =>
-    "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/virtualNetworkGateways"
-  }
-  vpn_gateway_resource_id = {
-    for location in local.hub_network_locations :
-    location =>
-    "${local.vpn_gateway_resource_id_prefix[location]}/${local.vpn_gateway_name[location]}"
-  }
-  vpn_gateway_config = [
+
+  vpn_gateway_config = [for g in [
     for location, hub_network in local.hub_networks_by_location :
     {
       # Resource logic attributes
-      resource_id       = local.vpn_gateway_resource_id[location]
       managed_by_module = local.deploy_virtual_network_gateway_vpn[location]
       # Resource definition attributes
       name                = local.vpn_gateway_name[location]
@@ -459,7 +438,16 @@ locals {
         )
       }
     }
+    ] : merge(g, {
+
+      resource_id = "/subscriptions/${local.subscription_id}/${g.resource_group_name}/providers/Microsoft.Network/virtualNetworkGateways/${g.name}"
+    })
   ]
+
+  vpn_gateway_resource_id = {
+    for vpn in local.vpn_gateway_config :
+    vpn.location => vpn.resource_id
+  }
 }
 
 # Configuration settings for resource type:
@@ -474,20 +462,7 @@ locals {
 # Configuration settings for resource type:
 #  - azurerm_firewall
 locals {
-  azfw_name = {
-    for location in local.hub_network_locations :
-    location => "${local.resource_prefix}-fw-${location}${local.resource_suffix}"
-  }
-  azfw_resource_id_prefix = {
-    for location in local.hub_network_locations :
-    location =>
-    "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/azureFirewalls"
-  }
-  azfw_resource_id = {
-    for location in local.hub_network_locations :
-    location =>
-    "${local.azfw_resource_id_prefix[location]}/${local.azfw_name[location]}"
-  }
+
   azfw_zones = {
     for location, hub_network in local.hub_networks_by_location :
     location =>
@@ -504,26 +479,22 @@ locals {
     location =>
     length(local.azfw_zones[location]) > 0
   }
-  azurerm_firewall = [
+
+  azfw_name = {
+    for location, hub_network in local.hub_networks_by_location :
+    location => coalesce(hub_network.config.azure_firewall.config.name, "${local.resource_prefix}-fw-${location}${local.resource_suffix}")
+  }
+
+  azurerm_firewall = [for f in [
     for location, hub_network in local.hub_networks_by_location :
     {
       # Resource logic attributes
-      resource_id       = local.azfw_resource_id[location]
       managed_by_module = local.deploy_azure_firewall[location]
       # Resource definition attributes
       name                = local.azfw_name[location]
       resource_group_name = local.resource_group_names_by_scope_and_location["connectivity"][location]
       location            = hub_network.config.location
-      ip_configuration = try(
-        local.custom_settings.azurerm_firewall["connectivity"][location].ip_configuration,
-        [
-          {
-            name                 = "${local.azfw_name[location]}-pip"
-            public_ip_address_id = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${local.azfw_name[location]}-pip"
-            subnet_id            = "${local.virtual_network_resource_id[location]}/subnets/AzureFirewallSubnet"
-          }
-        ]
-      )
+
       sku_name                    = coalesce(hub_network.config.azure_firewall.config.sku_name, "AZFW_VNet")
       sku_tier                    = coalesce(hub_network.config.azure_firewall.config.sku_tier, "Standard")
       firewall_policy_id          = hub_network.config.azure_firewall.config.firewall_policy_id
@@ -535,6 +506,16 @@ locals {
       zones                       = coalesce(hub_network.config.azure_firewall.config.zones, local.azfw_zones[location])
       tags                        = coalesce(hub_network.config.azure_firewall.config.tags, local.tags)
       # Child resource definition attributes
+      ip_configuration = try(
+        local.custom_settings.azurerm_firewall["connectivity"][location].ip_configuration,
+        [
+          {
+            name                 = "${local.azfw_name[location]}-pip"
+            public_ip_address_id = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${local.azfw_name[location]}-pip"
+            subnet_id            = "${local.virtual_network_resource_id[location]}/subnets/AzureFirewallSubnet"
+          }
+        ]
+      )
       azurerm_public_ip = {
         # Resource logic attributes
         resource_id       = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${local.azfw_name[location]}-pip"
@@ -552,13 +533,21 @@ locals {
         public_ip_prefix_id     = hub_network.config.azure_firewall.config.public_ip_public_ip_prefix_id
         ip_tags                 = coalesce(hub_network.config.azure_firewall.config.public_ip_ip_tags, {})
         tags                    = coalesce(hub_network.config.azure_firewall.config.public_ip_tags, local.tags)
-        availability_zone = try(
-          local.custom_settings.azurerm_public_ip["connectivity"]["azfw"][location].availability_zone,
+        availability_zone = coalesce(
+          hub_network.config.azure_firewall.config.public_ip_availability_zone,
           local.azfw_zones_enabled[location] ? "Zone-Redundant" : "No-Zone"
         )
       }
     }
+    ] : merge(f, {
+      resource_id = "/subscriptions/${local.subscription_id}/${f.resource_group_name}/providers/Microsoft.Network/azureFirewalls/${f.name}"
+    })
   ]
+
+  azfw_resource_id = {
+    for f in local.azurerm_firewall :
+    f.location => f.resource_id
+  }
 }
 
 # Configuration settings for resource type:
@@ -1068,22 +1057,18 @@ locals {
     ddos_location                                 = local.ddos_location
     dns_location                                  = local.dns_location
     virtual_network_resource_group_id             = local.virtual_network_resource_group_id
-    virtual_network_resource_id_prefix            = local.virtual_network_resource_id_prefix
     virtual_network_resource_id                   = local.virtual_network_resource_id
     azurerm_virtual_network                       = local.azurerm_virtual_network
     subnets_by_virtual_network                    = local.subnets_by_virtual_network
     azurerm_subnet                                = local.azurerm_subnet
     er_gateway_name                               = local.er_gateway_name
-    er_gateway_resource_id_prefix                 = local.er_gateway_resource_id_prefix
     er_gateway_resource_id                        = local.er_gateway_resource_id
     er_gateway_config                             = local.er_gateway_config
     vpn_gateway_name                              = local.vpn_gateway_name
-    vpn_gateway_resource_id_prefix                = local.vpn_gateway_resource_id_prefix
     vpn_gateway_resource_id                       = local.vpn_gateway_resource_id
     vpn_gateway_config                            = local.vpn_gateway_config
     azurerm_virtual_network_gateway               = local.azurerm_virtual_network_gateway
     azfw_name                                     = local.azfw_name
-    azfw_resource_id_prefix                       = local.azfw_resource_id_prefix
     azfw_resource_id                              = local.azfw_resource_id
     azurerm_firewall                              = local.azurerm_firewall
     azurerm_public_ip                             = local.azurerm_public_ip
