@@ -91,8 +91,37 @@ variable "configure_management_resources" {
           enable_solution_for_updates                 = bool
           enable_solution_for_vm_insights             = bool
           enable_sentinel                             = bool
+
+          workspace_name                              = optional(string)
+          workspace_resource_group_name               = optional(string)
+          workspace_location                          = optional(string)
+          workspace_sku                               = optional(string)
+          workspace_daily_quota_gb                    = optional(number)
+          workspace_internet_ingestion_enabled        = optional(bool)
+          workspace_internet_query_enabled            = optional(bool)
+          workspace_reservation_capcity_in_gb_per_day = optional(number)
+          workspace_tags                              = optional(map(string))
+
+          solution_resource_group_name = optional(string)
+          solution_location            = optional(string)
+          solution_tags                = optional(map(string))
         })
       })
+      automation_account = optional(object({
+        name                = string
+        location            = string
+        sku_name            = string
+        tags                = map(string)
+        resource_group_name = string
+      }))
+
+      log_analytics_linked_service = optional(object({
+        workspace_id        = string
+        read_access_id      = string
+        tags                = map(string)
+        resource_group_name = string
+      }))
+
       security_center = object({
         enabled = bool
         config = object({
@@ -109,6 +138,10 @@ variable "configure_management_resources" {
           enable_defender_for_storage        = bool
         })
       })
+
+      resource_group_name     = optional(string)
+      resource_group_location = optional(string)
+      resource_group_tags     = optional(map(string))
     })
     location = any
     tags     = any
@@ -218,30 +251,133 @@ variable "configure_connectivity_resources" {
                 address_prefixes          = list(string)
                 network_security_group_id = string
                 route_table_id            = string
+
+                enforce_private_link_endpoint_network_policies = optional(bool)
+                enforce_private_link_service_network_policies  = optional(bool)
+                service_endpoints                              = optional(list(string))
+                service_endpoint_policy_ids                    = optional(list(string))
+                delegation                                     = optional(list(string))
               })
             )
+
             virtual_network_gateway = object({
               enabled = bool
               config = object({
-                address_prefix           = string # Only support adding a single address prefix for GatewaySubnet subnet
-                gateway_sku_expressroute = string # If specified, will deploy the ExpressRoute gateway into the GatewaySubnet subnet
-                gateway_sku_vpn          = string # If specified, will deploy the VPN gateway into the GatewaySubnet subnet
+                address_prefix           = string
+                gateway_sku_expressroute = string
+                gateway_sku_vpn          = string
+
+                name                                           = optional(string)
+                enforce_private_link_endpoint_network_policies = optional(bool)
+                enforce_private_link_service_network_policies  = optional(bool)
+                service_endpoints                              = optional(list(string))
+                service_endpoint_policy_ids                    = optional(list(string))
+                delegation                                     = optional(list(string))
+                vpn_type                                       = optional(string)
+                enable_bgp                                     = optional(bool)
+                active_active                                  = optional(bool)
+                private_ip_address_enabled                     = optional(bool)
+                default_local_network_gateway_id               = optional(string)
+                generation                                     = optional(string)
+                vpn_client_configuration                       = optional(list(string))
+                bgp_settings                                   = optional(list(string))
+                custom_route                                   = optional(list(string))
+                tags                                           = optional(map(string))
+
+                ip_configuration = optional(list(object({
+                  name                 = string
+                  public_ip_address_id = string
+                  subnet_id            = string
+                })))
+
+                public_ip_sku                     = optional(string)
+                public_ip_allocation_method       = optional(string)
+                public_ip_availability_zone       = optional(string)
+                public_ip_ip_version              = optional(string)
+                public_ip_idle_timeout_in_minutes = optional(string)
+                public_ip_domain_name_label       = optional(string)
+                public_ip_reverse_fqdn            = optional(string)
+                public_ip_public_ip_prefix_id     = optional(string)
+                public_ip_ip_tags                 = optional(map(string))
+                public_ip_tags                    = optional(map(string))
+
+                expressroute_vpn_type                         = optional(string)
+                expressroute_enable_bgp                       = optional(bool)
+                expressroute_active_active                    = optional(bool)
+                expressroute_private_ip_address_enabled       = optional(bool)
+                expressroute_default_local_network_gateway_id = optional(string)
+                expressroute_generation                       = optional(string)
+                expressroute_vpn_client_configuration         = optional(list(string))
+                expressroute_bgp_settings                     = optional(list(string))
+                expressroute_custom_route                     = optional(list(string))
+                expressroute_tags                             = optional(map(string))
+
+                expressroute_public_ip_sku                     = optional(string)
+                expressroute_public_ip_allocation_method       = optional(string)
+                expressroute_public_ip_availability_zone       = optional(string)
+                expressroute_public_ip_ip_version              = optional(string)
+                expressroute_public_ip_idle_timeout_in_minutes = optional(string)
+                expressroute_public_ip_domain_name_label       = optional(string)
+                expressroute_public_ip_reverse_fqdn            = optional(string)
+                expressroute_public_ip_public_ip_prefix_id     = optional(string)
+                expressroute_public_ip_ip_tags                 = optional(map(string))
+                expressroute_public_ip_tags                    = optional(map(string))
               })
             })
             azure_firewall = object({
               enabled = bool
               config = object({
-                address_prefix   = string # Only support adding a single address prefix for AzureFirewallManagementSubnet subnet
+                address_prefix   = string
                 enable_dns_proxy = bool
                 availability_zones = object({
                   zone_1 = bool
                   zone_2 = bool
                   zone_3 = bool
                 })
+
+                ip_configuration = optional(list(object({
+                  name                 = string
+                  public_ip_address_id = string
+                  subnet_id            = string
+                })))
+
+                name                        = optional(string)
+                sku_name                    = optional(string)
+                sku_tier                    = optional(string)
+                firewall_policy_id          = optional(string)
+                dns_servers                 = optional(list(string))
+                private_ip_ranges           = optional(list(string))
+                management_ip_configuration = optional(list(string))
+                threat_intel_mode           = optional(string)
+                virtual_hub                 = optional(list(string))
+                zones                       = optional(list(string))
+                tags                        = optional(map(string))
+
+                enforce_private_link_endpoint_network_policies = optional(bool)
+                enforce_private_link_service_network_policies  = optional(bool)
+                service_endpoints                              = optional(list(string))
+                service_endpoint_policy_ids                    = optional(list(string))
+                delegation                                     = optional(list(string))
+
+                public_ip_sku                     = optional(string)
+                public_ip_allocation_method       = optional(string)
+                public_ip_availability_zone       = optional(string)
+                public_ip_ip_version              = optional(string)
+                public_ip_idle_timeout_in_minutes = optional(string)
+                public_ip_domain_name_label       = optional(string)
+                public_ip_reverse_fqdn            = optional(string)
+                public_ip_public_ip_prefix_id     = optional(string)
+                public_ip_ip_tags                 = optional(map(string))
+                public_ip_tags                    = optional(map(string))
               })
             })
             spoke_virtual_network_resource_ids      = list(string)
             enable_outbound_virtual_network_peering = bool
+
+            virtual_network_name = optional(string)
+            resource_group_name  = optional(string)
+            resource_group_tags  = optional(map(string))
+            tags                 = optional(map(string))
           })
         })
       )
@@ -249,7 +385,11 @@ variable "configure_connectivity_resources" {
       ddos_protection_plan = object({
         enabled = bool
         config = object({
-          location = string
+          location            = string
+          tags                = optional(map(string))
+          name                = optional(string)
+          resource_group_name = optional(string)
+          resource_group_tags = optional(map(string))
         })
       })
       dns = object({
@@ -304,6 +444,15 @@ variable "configure_connectivity_resources" {
           private_dns_zones                                      = list(string)
           enable_private_dns_zone_virtual_network_link_on_hubs   = bool
           enable_private_dns_zone_virtual_network_link_on_spokes = bool
+
+          resource_group_name = optional(string)
+          resource_group_tags = optional(map(string))
+
+          fqdn = optional(map(object({
+            resource_group_name = optional(string)
+            soa_record          = optional(list(string))
+            tags                = optional(map(string))
+          })))
         })
       })
     })
