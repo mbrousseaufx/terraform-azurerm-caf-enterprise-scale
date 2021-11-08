@@ -59,8 +59,37 @@ variable "settings" {
         enable_solution_for_updates                 = bool
         enable_solution_for_vm_insights             = bool
         enable_sentinel                             = bool
+
+        workspace_name                              = optional(string)
+        workspace_resource_group_name               = optional(string)
+        workspace_location                          = optional(string)
+        workspace_sku                               = optional(string)
+        workspace_daily_quota_gb                    = optional(number)
+        workspace_internet_ingestion_enabled        = optional(bool)
+        workspace_internet_query_enabled            = optional(bool)
+        workspace_reservation_capcity_in_gb_per_day = optional(number)
+        workspace_tags                              = optional(map(string))
+
+        solution_resource_group_name = optional(string)
+        solution_location            = optional(string)
+        solution_tags                = optional(map(string))
       })
     })
+    automation_account = optional(object({
+      name     = string
+      location = string
+      sku_name = string
+      tags     = map(string)
+      resource_group_name = string
+    }))
+
+    log_analytics_linked_service = optional(object({
+      workspace_id     = string
+      read_access_id = string
+      tags     = map(string)
+      resource_group_name = string
+    }))
+
     security_center = object({
       enabled = bool
       config = object({
@@ -77,6 +106,10 @@ variable "settings" {
         enable_defender_for_storage        = bool
       })
     })
+
+    resource_group_name     = optional(string)
+    resource_group_location = optional(string)
+    resource_group_tags     = optional(map(string))
   })
   description = "Configuration settings for the \"Management\" landing zone resources."
 }

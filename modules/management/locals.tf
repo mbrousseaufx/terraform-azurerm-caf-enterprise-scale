@@ -28,9 +28,6 @@ locals {
 # Extract individual custom settings blocks from
 # the custom_settings_by_resource_type variable.
 locals {
-  custom_settings_rsg               = try(local.custom_settings.azurerm_resource_group["management"], null)
-  custom_settings_la_workspace      = try(local.custom_settings.azurerm_log_analytics_workspace["management"], null)
-  custom_settings_la_solution       = try(local.custom_settings.azurerm_log_analytics_solution["management"], null)
   custom_settings_aa                = try(local.custom_settings.azurerm_automation_account["management"], null)
   custom_settings_la_linked_service = try(local.custom_settings.azurerm_log_analytics_linked_service["management"], null)
 }
@@ -77,14 +74,14 @@ locals {
 locals {
   resource_group_name = coalesce(
     local.existing_resource_group_name,
-    try(local.custom_settings_rsg.name, null),
+    local.settings.resource_group_name,
     "${local.resource_prefix}-mgmt",
   )
   resource_group_resource_id = "/subscriptions/${local.subscription_id}/resourceGroups/${local.resource_group_name}"
   azurerm_resource_group = {
     name     = local.resource_group_name,
-    location = try(local.custom_settings_rsg.location, local.location)
-    tags     = try(local.custom_settings_rsg.tags, local.tags)
+    location = coalesce(local.settings.resource_group_location, local.location)
+    tags     = coalesce(local.settings.resource_group_tags, local.tags)
   }
 }
 
@@ -92,25 +89,24 @@ locals {
 # Configuration settings for resource type:
 #  - azurerm_log_analytics_workspace
 locals {
-  log_analytics_workspace_resource_id = coalesce(
-    local.existing_log_analytics_workspace_resource_id,
-    "${local.resource_group_resource_id}/providers/Microsoft.OperationalInsights/workspaces/${local.azurerm_log_analytics_workspace.name}"
-  )
+  log_analytics = local.settings.log_analytics.config
   azurerm_log_analytics_workspace = {
-    name                              = try(local.custom_settings_la_workspace.name, "${local.resource_prefix}-la${local.resource_suffix}")
-    location                          = try(local.custom_settings_la_workspace.location, local.location)
-    sku                               = try(local.custom_settings_la_workspace.sku, "PerGB2018")
-    retention_in_days                 = try(local.custom_settings_la_workspace.retention_in_days, local.settings.log_analytics.config.retention_in_days)
-    daily_quota_gb                    = try(local.custom_settings_la_workspace.daily_quota_gb, null)
-    internet_ingestion_enabled        = try(local.custom_settings_la_workspace.internet_ingestion_enabled, true)
-    internet_query_enabled            = try(local.custom_settings_la_workspace.internet_query_enabled, true)
-    reservation_capcity_in_gb_per_day = try(local.custom_settings_la_workspace.reservation_capcity_in_gb_per_day, null) # Requires version = "~> 2.48.0"
-    tags                              = try(local.custom_settings_la_workspace.tags, local.tags)
-    resource_group_name = coalesce(
-      try(local.custom_settings_la_workspace.resource_group_name, null),
-      local.resource_group_name,
-    )
+    name                              = coalesce(local.log_analytics.workspace_name, "${local.resource_prefix}-la${local.resource_suffix}")
+    location                          = coalesce(local.log_analytics.workspace_location, local.location)
+    sku                               = coalesce(local.log_analytics.workspace_sku, "PerGB2018")
+    retention_in_days                 = local.log_analytics.retention_in_days
+    daily_quota_gb                    = local.log_analytics.workspace_daily_quota_gb,
+    internet_ingestion_enabled        = coalesce(local.log_analytics.workspace_internet_ingestion_enabled, true)
+    internet_query_enabled            = coalesce(local.log_analytics.workspace_internet_query_enabled, true)
+    reservation_capcity_in_gb_per_day = local.log_analytics.workspace_reservation_capcity_in_gb_per_day # Requires version = "~> 2.48.0"
+    tags                              = coalesce(local.log_analytics.workspace_tags, local.tags)
+    resource_group_name               = coalesce(local.log_analytics.workspace_resource_group_name, local.resource_group_name)
   }
+
+log_analytics_workspace_resource_id = coalesce(
+  local.existing_log_analytics_workspace_resource_id,
+  "${local.resource_group_resource_id}/providers/Microsoft.OperationalInsights/workspaces/${local.azurerm_log_analytics_workspace.name}"
+)
 }
 
 # Configuration settings for resource type:
@@ -124,16 +120,16 @@ locals {
     for solution_name, solution_enabled in local.deploy_azure_monitor_solutions :
     {
       solution_name         = solution_name
-      location              = try(local.custom_settings_la_solution.location, local.location)
+      location              = coalesce(local.log_analytics.solution_location, local.location)
       workspace_resource_id = local.log_analytics_workspace_resource_id
       workspace_name        = basename(local.log_analytics_workspace_resource_id)
-      tags                  = try(local.custom_settings_la_solution.tags, local.tags)
+      tags                  = coalesce(local.log_analytics.solution_tags, local.tags)
       plan = {
         publisher = "Microsoft"
         product   = "OMSGallery/${solution_name}"
       }
       resource_group_name = coalesce(
-        try(local.custom_settings_la_solution.resource_group_name, null),
+        local.log_analytics.solution_resource_group_name,
         local.resource_group_name,
       )
     }
@@ -149,12 +145,12 @@ locals {
     "${local.resource_group_resource_id}/providers/Microsoft.Automation/automationAccounts/${local.azurerm_automation_account.name}"
   )
   azurerm_automation_account = {
-    name     = try(local.custom_settings_aa.name, "${local.resource_prefix}-automation${local.resource_suffix}")
-    location = try(local.custom_settings_aa.location, local.location)
-    sku_name = try(local.custom_settings_aa.sku_name, "Basic")
-    tags     = try(local.custom_settings_aa.tags, local.tags)
+    name     = coalesce(try(local.settings.automation_account.name,null), "${local.resource_prefix}-automation${local.resource_suffix}")
+    location = coalesce(try(local.settings.automation_account.location,null), local.location)
+    sku_name = coalesce(try(local.settings.automation_account.sku_name,null), "Basic")
+    tags     = coalesce(try(local.settings.automation_account.tags,null), local.tags)
     resource_group_name = coalesce(
-      try(local.custom_settings_aa.resource_group_name, null),
+      try(local.settings.automation_account.resource_group_name,null),
       local.resource_group_name,
     )
   }
@@ -165,12 +161,12 @@ locals {
 locals {
   log_analytics_linked_service_resource_id = "${local.log_analytics_workspace_resource_id}/linkedServices/Automation"
   azurerm_log_analytics_linked_service = {
-    workspace_id    = try(local.custom_settings_la_linked_service.workspace_id, local.log_analytics_workspace_resource_id)
-    read_access_id  = try(local.custom_settings_la_linked_service.read_access_id, local.automation_account_resource_id) # This should be used for linking to an Automation Account resource.
+    workspace_id    = coalesce(try(local.settings.log_analytics_linked_service.workspace_id,null), local.log_analytics_workspace_resource_id)
+    read_access_id  = coalesce(try(local.settings.log_analytics_linked_service.read_access_id,null), local.automation_account_resource_id) # This should be used for linking to an Automation Account resource.
     write_access_id = null                                                                                              # DO NOT USE. This should be used for linking to a Log Analytics Cluster resource
-    tags            = try(local.custom_settings_la_linked_service.tags, local.tags)
+    tags            = coalesce(try(local.settings.log_analytics_linked_service.tags,null), local.tags)
     resource_group_name = coalesce(
-      try(local.custom_settings_la_linked_service.resource_group_name, null),
+      try(local.settings.log_analytics_linked_service.resource_group_name, null),
       local.resource_group_name,
     )
   }
