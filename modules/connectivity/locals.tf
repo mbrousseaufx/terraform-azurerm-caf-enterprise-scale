@@ -112,25 +112,28 @@ locals {
       location =>
       {
         name = coalesce(hub.config.resource_group_name, "${local.resource_prefix}-connectivity-${location}${local.resource_suffix}")
-        tags = coalesce(hub.config.resource_group_tag, local.tags)
+        tags = coalesce(hub.config.resource_group_tags, local.tags)
       }
     }
     ddos = {
       (local.ddos_location) = {
         name = coalesce(local.settings.ddos_protection_plan.config.resource_group_name, "${local.resource_prefix}-ddos${local.resource_suffix}")
-        tags = coalesce(hub.settings.ddos_protection_plan.config.resource_group_tag, local.tags)
+        tags = coalesce(local.settings.ddos_protection_plan.config.resource_group_tags, local.tags)
       }
     }
     dns = {
       (local.dns_location) = {
         name = coalesce(local.settings.dns.config.resource_group_name, "${local.resource_prefix}-dns${local.resource_suffix}")
-        tags = coalesce(hub.config.resource_group_tag, local.tags)
+        tags = coalesce(local.settings.dns.config.resource_group_tags, local.tags)
       }
     }
   }
   resource_group_names_by_scope_and_location = {
-    for location, rg in local.hub_networks_by_location_p1 :
-    location => rg.name
+    for scope, resource_groups in local.resource_group_names_by_scope_and_location_p1 :
+    scope => {
+      for location, rg in resource_groups :
+      location => rg.name
+    }
   }
   # Generate a map of settings for each Resource Group per scope and location
   resource_group_config_by_scope_and_location = {
@@ -403,10 +406,10 @@ locals {
         hub_network.config.virtual_network_gateway.config.vpn_ip_configuration,
         [
           {
-            name                          = coalesce(hub_network.config.virtual_network_gateway.config.public_ip_name, "${local.vpn_gateway_name[location]}-pip")
+            name                          = coalesce(hub_network.config.virtual_network_gateway.config.vpn_public_ip_name, "${local.vpn_gateway_name[location]}-pip")
             private_ip_address_allocation = null
             subnet_id                     = "${local.virtual_network_resource_id[location]}/subnets/GatewaySubnet"
-            public_ip_address_id          = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${coalesce(hub_network.config.virtual_network_gateway.config.public_ip_name, "${local.vpn_gateway_name[location]}-pip")}"
+            public_ip_address_id          = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${coalesce(hub_network.config.virtual_network_gateway.config.vpn_public_ip_name, "${local.vpn_gateway_name[location]}-pip")}"
           }
         ]
       )
@@ -423,29 +426,29 @@ locals {
       # Child resource definition attributes
       azurerm_public_ip = {
         # Resource logic attributes
-        resource_id       = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${coalesce(hub_network.config.virtual_network_gateway.config.public_ip_name, "${local.vpn_gateway_name[location]}-pip")}"
+        resource_id       = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${coalesce(hub_network.config.virtual_network_gateway.config.vpn_public_ip_name, "${local.vpn_gateway_name[location]}-pip")}"
         managed_by_module = local.deploy_virtual_network_gateway_vpn[location]
         # Resource definition attributes
-        name                    = coalesce(hub_network.config.virtual_network_gateway.config.public_ip_name, "${local.vpn_gateway_name[location]}-pip")
+        name                    = coalesce(hub_network.config.virtual_network_gateway.config.vpn_public_ip_name, "${local.vpn_gateway_name[location]}-pip")
         resource_group_name     = local.resource_group_names_by_scope_and_location["connectivity"][location]
         location                = location
-        ip_version              = hub_network.config.virtual_network_gateway.config.public_ip_ip_version
-        idle_timeout_in_minutes = hub_network.config.virtual_network_gateway.config.public_ip_idle_timeout_in_minutes
-        domain_name_label       = hub_network.config.virtual_network_gateway.config.public_ip_domain_name_label
-        reverse_fqdn            = hub_network.config.virtual_network_gateway.config.public_ip_reverse_fqdn
-        public_ip_prefix_id     = hub_network.config.virtual_network_gateway.config.public_ip_public_ip_prefix_id
-        ip_tags                 = coalesce(hub_network.config.virtual_network_gateway.config.public_ip_ip_tags, {})
-        tags                    = coalesce(hub_network.config.virtual_network_gateway.config.public_ip_tags, local.tags)
+        ip_version              = hub_network.config.virtual_network_gateway.config.vpn_public_ip_ip_version
+        idle_timeout_in_minutes = hub_network.config.virtual_network_gateway.config.vpn_public_ip_idle_timeout_in_minutes
+        domain_name_label       = hub_network.config.virtual_network_gateway.config.vpn_public_ip_domain_name_label
+        reverse_fqdn            = hub_network.config.virtual_network_gateway.config.vpn_public_ip_reverse_fqdn
+        public_ip_prefix_id     = hub_network.config.virtual_network_gateway.config.vpn_public_ip_public_ip_prefix_id
+        ip_tags                 = coalesce(hub_network.config.virtual_network_gateway.config.vpn_public_ip_ip_tags, {})
+        tags                    = coalesce(hub_network.config.virtual_network_gateway.config.vpn_public_ip_tags, local.tags)
         sku = try(
-          hub_network.config.virtual_network_gateway.config.public_ip_sku,
+          hub_network.config.virtual_network_gateway.config.vpn_public_ip_sku,
           length(regexall("AZ$", hub_network.config.virtual_network_gateway.config.gateway_sku_vpn)) > 0 ? "Standard" : "Basic"
         )
         allocation_method = try(
-          hub_network.config.virtual_network_gateway.config.public_ip_allocation_method,
+          hub_network.config.virtual_network_gateway.config.vpn_public_ip_allocation_method,
           length(regexall("AZ$", hub_network.config.virtual_network_gateway.config.gateway_sku_vpn)) > 0 ? "Static" : "Dynamic"
         )
         availability_zone = try(
-          hub_network.config.virtual_network_gateway.config.public_ip_availability_zone,
+          hub_network.config.virtual_network_gateway.config.vpn_public_ip_availability_zone,
           length(regexall("AZ$", hub_network.config.virtual_network_gateway.config.gateway_sku_vpn)) > 0 ? "Zone-Redundant" : "No-Zone"
         )
       }

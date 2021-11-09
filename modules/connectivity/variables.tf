@@ -173,6 +173,7 @@ variable "settings" {
               service_endpoint_policy_ids                    = optional(list(string))
               delegation                                     = optional(list(string))
 
+              public_ip_name                    = optional(string)
               public_ip_sku                     = optional(string)
               public_ip_allocation_method       = optional(string)
               public_ip_availability_zone       = optional(string)
