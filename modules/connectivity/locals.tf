@@ -308,15 +308,15 @@ locals {
       location            = location
       type                = "ExpressRoute"
       sku                 = hub_network.config.virtual_network_gateway.config.gateway_sku_expressroute
-      ip_configuration = try(
+      ip_configuration = coalesce(
         # To support `active_active = true` must currently specify a custom ip_configuration
-        local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["ergw"][location].ip_configuration,
+        hub_network.config.virtual_network_gateway.config.expressroute_ip_configuration,
         [
           {
-            name                          = "${local.er_gateway_name[location]}-pip"
+            name                          = coalesce(hub_network.config.virtual_network_gateway.config.expressroute_public_ip_name, "${local.er_gateway_name[location]}-pip")
             private_ip_address_allocation = null
             subnet_id                     = "${local.virtual_network_resource_id[location]}/subnets/GatewaySubnet"
-            public_ip_address_id          = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${local.er_gateway_name[location]}-pip"
+            public_ip_address_id          = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${coalesce(hub_network.config.virtual_network_gateway.config.expressroute_public_ip_name, "${local.er_gateway_name[location]}-pip")}"
           }
         ]
       )
@@ -333,10 +333,10 @@ locals {
       # Child resource definition attributes
       azurerm_public_ip = {
         # Resource logic attributes
-        resource_id       = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${local.er_gateway_name[location]}-pip"
+        resource_id       = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${coalesce(hub_network.config.virtual_network_gateway.config.expressroute_public_ip_name, "${local.er_gateway_name[location]}-pip")}"
         managed_by_module = local.deploy_virtual_network_gateway_expressroute[location]
         # Resource definition attributes
-        name                    = "${local.er_gateway_name[location]}-pip"
+        name                    = coalesce(hub_network.config.virtual_network_gateway.config.expressroute_public_ip_name, "${local.er_gateway_name[location]}-pip")
         resource_group_name     = local.resource_group_names_by_scope_and_location["connectivity"][location]
         location                = location
         sku                     = coalesce(hub_network.config.virtual_network_gateway.config.expressroute_public_ip_sku, "Standard")
@@ -386,35 +386,35 @@ locals {
       location            = location
       type                = "Vpn"
       sku                 = hub_network.config.virtual_network_gateway.config.gateway_sku_vpn
-      ip_configuration = try(
+      ip_configuration = coalesce(
         # To support `active_active = true` must currently specify a custom ip_configuration
-        local.custom_settings.azurerm_virtual_network_gateway["connectivity"]["vpngw"][location].ip_configuration,
+        hub_network.config.virtual_network_gateway.config.vpn_ip_configuration,
         [
           {
-            name                          = "${local.vpn_gateway_name[location]}-pip"
+            name                          = coalesce(hub_network.config.virtual_network_gateway.config.public_ip_name, "${local.vpn_gateway_name[location]}-pip")
             private_ip_address_allocation = null
             subnet_id                     = "${local.virtual_network_resource_id[location]}/subnets/GatewaySubnet"
-            public_ip_address_id          = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${local.vpn_gateway_name[location]}-pip"
+            public_ip_address_id          = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${coalesce(hub_network.config.virtual_network_gateway.config.public_ip_name, "${local.vpn_gateway_name[location]}-pip")}"
           }
         ]
       )
       vpn_type                         = coalesce(hub_network.config.virtual_network_gateway.config.vpn_type, "RouteBased")
-      enable_bgp                       = coalesce(hub_network.config.virtual_network_gateway.config.enable_bgp, false)
-      active_active                    = coalesce(hub_network.config.virtual_network_gateway.config.active_active, false)
-      private_ip_address_enabled       = hub_network.config.virtual_network_gateway.config.private_ip_address_enabled
-      default_local_network_gateway_id = hub_network.config.virtual_network_gateway.config.default_local_network_gateway_id
-      generation                       = hub_network.config.virtual_network_gateway.config.generation
+      enable_bgp                       = coalesce(hub_network.config.virtual_network_gateway.config.vpn_enable_bgp, false)
+      active_active                    = coalesce(hub_network.config.virtual_network_gateway.config.vpn_active_active, false)
+      private_ip_address_enabled       = hub_network.config.virtual_network_gateway.config.vpn_private_ip_address_enabled
+      default_local_network_gateway_id = hub_network.config.virtual_network_gateway.config.vpn_default_local_network_gateway_id
+      generation                       = hub_network.config.virtual_network_gateway.config.vpn_generation
       vpn_client_configuration         = coalesce(hub_network.config.virtual_network_gateway.config.vpn_client_configuration, [])
-      bgp_settings                     = coalesce(hub_network.config.virtual_network_gateway.config.bgp_settings, [])
-      custom_route                     = coalesce(hub_network.config.virtual_network_gateway.config.custom_route, [])
-      tags                             = coalesce(hub_network.config.virtual_network_gateway.config.tags, local.tags)
+      bgp_settings                     = coalesce(hub_network.config.virtual_network_gateway.config.vpn_bgp_settings, [])
+      custom_route                     = coalesce(hub_network.config.virtual_network_gateway.config.vpn_custom_route, [])
+      tags                             = coalesce(hub_network.config.virtual_network_gateway.config.vpn_tags, local.tags)
       # Child resource definition attributes
       azurerm_public_ip = {
         # Resource logic attributes
-        resource_id       = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${local.vpn_gateway_name[location]}-pip"
+        resource_id       = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${coalesce(hub_network.config.virtual_network_gateway.config.public_ip_name, "${local.vpn_gateway_name[location]}-pip")}"
         managed_by_module = local.deploy_virtual_network_gateway_vpn[location]
         # Resource definition attributes
-        name                    = "${local.vpn_gateway_name[location]}-pip"
+        name                    = coalesce(hub_network.config.virtual_network_gateway.config.public_ip_name, "${local.vpn_gateway_name[location]}-pip")
         resource_group_name     = local.resource_group_names_by_scope_and_location["connectivity"][location]
         location                = location
         ip_version              = hub_network.config.virtual_network_gateway.config.public_ip_ip_version
@@ -425,15 +425,15 @@ locals {
         ip_tags                 = coalesce(hub_network.config.virtual_network_gateway.config.public_ip_ip_tags, {})
         tags                    = coalesce(hub_network.config.virtual_network_gateway.config.public_ip_tags, local.tags)
         sku = try(
-          hub_network.config.virtual_network_gateway.configpublic_ip_sku,
+          hub_network.config.virtual_network_gateway.config.public_ip_sku,
           length(regexall("AZ$", hub_network.config.virtual_network_gateway.config.gateway_sku_vpn)) > 0 ? "Standard" : "Basic"
         )
         allocation_method = try(
-          hub_network.config.virtual_network_gateway.configpublic_ip_allocation_method,
+          hub_network.config.virtual_network_gateway.config.public_ip_allocation_method,
           length(regexall("AZ$", hub_network.config.virtual_network_gateway.config.gateway_sku_vpn)) > 0 ? "Static" : "Dynamic"
         )
         availability_zone = try(
-          hub_network.config.virtual_network_gateway.configpublic_ip_availability_zone,
+          hub_network.config.virtual_network_gateway.config.public_ip_availability_zone,
           length(regexall("AZ$", hub_network.config.virtual_network_gateway.config.gateway_sku_vpn)) > 0 ? "Zone-Redundant" : "No-Zone"
         )
       }
@@ -506,22 +506,22 @@ locals {
       zones                       = coalesce(hub_network.config.azure_firewall.config.zones, local.azfw_zones[location])
       tags                        = coalesce(hub_network.config.azure_firewall.config.tags, local.tags)
       # Child resource definition attributes
-      ip_configuration = try(
-        local.custom_settings.azurerm_firewall["connectivity"][location].ip_configuration,
+      ip_configuration = coalesce(
+        hub_network.config.azure_firewall.config.ip_configuration,
         [
           {
-            name                 = "${local.azfw_name[location]}-pip"
-            public_ip_address_id = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${local.azfw_name[location]}-pip"
+            name                 = coalesce(hub_network.config.azure_firewall.config.public_ip_name, "${local.azfw_name[location]}-pip")
+            public_ip_address_id = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${coalesce(hub_network.config.azure_firewall.config.public_ip_name, "${local.azfw_name[location]}-pip")}"
             subnet_id            = "${local.virtual_network_resource_id[location]}/subnets/AzureFirewallSubnet"
           }
         ]
       )
       azurerm_public_ip = {
         # Resource logic attributes
-        resource_id       = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${local.azfw_name[location]}-pip"
+        resource_id       = "${local.virtual_network_resource_group_id[location]}/providers/Microsoft.Network/publicIPAddresses/${coalesce(hub_network.config.azure_firewall.config.public_ip_name, "${local.azfw_name[location]}-pip")}"
         managed_by_module = local.deploy_azure_firewall[location]
         # Resource definition attributes
-        name                    = "${local.azfw_name[location]}-pip"
+        name                    = coalesce(hub_network.config.azure_firewall.config.public_ip_name, "${local.azfw_name[location]}-pip")
         resource_group_name     = local.resource_group_names_by_scope_and_location["connectivity"][location]
         location                = location
         sku                     = coalesce(hub_network.config.azure_firewall.config.public_ip_sku, "Standard")

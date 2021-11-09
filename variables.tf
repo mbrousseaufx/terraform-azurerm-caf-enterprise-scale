@@ -273,33 +273,35 @@ variable "configure_connectivity_resources" {
                 service_endpoints                              = optional(list(string))
                 service_endpoint_policy_ids                    = optional(list(string))
                 delegation                                     = optional(list(string))
-                vpn_type                                       = optional(string)
-                enable_bgp                                     = optional(bool)
-                active_active                                  = optional(bool)
-                private_ip_address_enabled                     = optional(bool)
-                default_local_network_gateway_id               = optional(string)
-                generation                                     = optional(string)
-                vpn_client_configuration                       = optional(list(string))
-                bgp_settings                                   = optional(list(string))
-                custom_route                                   = optional(list(string))
-                tags                                           = optional(map(string))
 
-                ip_configuration = optional(list(object({
+                vpn_type                             = optional(string)
+                vpn_enable_bgp                       = optional(bool)
+                vpn_active_active                    = optional(bool)
+                vpn_private_ip_address_enabled       = optional(bool)
+                vpn_default_local_network_gateway_id = optional(string)
+                vpn_generation                       = optional(string)
+                vpn_client_configuration             = optional(list(string))
+                vpn_bgp_settings                     = optional(list(string))
+                vpn_custom_route                     = optional(list(string))
+                vpn_tags                             = optional(map(string))
+
+                vpn_ip_configuration = optional(list(object({
                   name                 = string
                   public_ip_address_id = string
                   subnet_id            = string
                 })))
 
-                public_ip_sku                     = optional(string)
-                public_ip_allocation_method       = optional(string)
-                public_ip_availability_zone       = optional(string)
-                public_ip_ip_version              = optional(string)
-                public_ip_idle_timeout_in_minutes = optional(string)
-                public_ip_domain_name_label       = optional(string)
-                public_ip_reverse_fqdn            = optional(string)
-                public_ip_public_ip_prefix_id     = optional(string)
-                public_ip_ip_tags                 = optional(map(string))
-                public_ip_tags                    = optional(map(string))
+                vpn_public_ip_name                    = optional(string)
+                vpn_public_ip_sku                     = optional(string)
+                vpn_public_ip_allocation_method       = optional(string)
+                vpn_public_ip_availability_zone       = optional(string)
+                vpn_public_ip_ip_version              = optional(string)
+                vpn_public_ip_idle_timeout_in_minutes = optional(string)
+                vpn_public_ip_domain_name_label       = optional(string)
+                vpn_public_ip_reverse_fqdn            = optional(string)
+                vpn_public_ip_public_ip_prefix_id     = optional(string)
+                vpn_public_ip_ip_tags                 = optional(map(string))
+                vpn_public_ip_tags                    = optional(map(string))
 
                 expressroute_vpn_type                         = optional(string)
                 expressroute_enable_bgp                       = optional(bool)
@@ -311,7 +313,12 @@ variable "configure_connectivity_resources" {
                 expressroute_bgp_settings                     = optional(list(string))
                 expressroute_custom_route                     = optional(list(string))
                 expressroute_tags                             = optional(map(string))
-
+                expressroute_ip_configuration = optional(list(object({
+                  name                 = string
+                  public_ip_address_id = string
+                  subnet_id            = string
+                })))
+                expressroute_public_ip_name                    = optional(string)
                 expressroute_public_ip_sku                     = optional(string)
                 expressroute_public_ip_allocation_method       = optional(string)
                 expressroute_public_ip_availability_zone       = optional(string)
