@@ -439,15 +439,15 @@ locals {
         public_ip_prefix_id     = hub_network.config.virtual_network_gateway.config.vpn_public_ip_public_ip_prefix_id
         ip_tags                 = coalesce(hub_network.config.virtual_network_gateway.config.vpn_public_ip_ip_tags, {})
         tags                    = coalesce(hub_network.config.virtual_network_gateway.config.vpn_public_ip_tags, local.tags)
-        sku = try(
+        sku = coalesce(
           hub_network.config.virtual_network_gateway.config.vpn_public_ip_sku,
           length(regexall("AZ$", hub_network.config.virtual_network_gateway.config.gateway_sku_vpn)) > 0 ? "Standard" : "Basic"
         )
-        allocation_method = try(
+        allocation_method = coalesce(
           hub_network.config.virtual_network_gateway.config.vpn_public_ip_allocation_method,
           length(regexall("AZ$", hub_network.config.virtual_network_gateway.config.gateway_sku_vpn)) > 0 ? "Static" : "Dynamic"
         )
-        availability_zone = try(
+        availability_zone = coalesce(
           hub_network.config.virtual_network_gateway.config.vpn_public_ip_availability_zone,
           length(regexall("AZ$", hub_network.config.virtual_network_gateway.config.gateway_sku_vpn)) > 0 ? "Zone-Redundant" : "No-Zone"
         )
