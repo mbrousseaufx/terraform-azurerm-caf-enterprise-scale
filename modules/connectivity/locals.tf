@@ -106,33 +106,45 @@ locals {
 #  - azurerm_resource_group
 locals {
   # Determine the name of each Resource Group per scope and location
-  resource_group_names_by_scope_and_location = {
+  resource_group_names_by_scope_and_location_p1 = {
     connectivity = {
       for location, hub in local.hub_networks_by_location :
-      location => coalesce(hub.config.resource_group_name, "${local.resource_prefix}-connectivity-${location}${local.resource_suffix}")
+      location =>
+      {
+        name = coalesce(hub.config.resource_group_name, "${local.resource_prefix}-connectivity-${location}${local.resource_suffix}")
+        tags = coalesce(hub.config.resource_group_tag, local.tags)
+      }
     }
     ddos = {
-      (local.ddos_location) = coalesce(local.settings.ddos_protection_plan.config.resource_group_name,
-      "${local.resource_prefix}-ddos${local.resource_suffix}")
+      (local.ddos_location) = {
+        name = coalesce(local.settings.ddos_protection_plan.config.resource_group_name, "${local.resource_prefix}-ddos${local.resource_suffix}")
+        tags = coalesce(hub.settings.ddos_protection_plan.config.resource_group_tag, local.tags)
+      }
     }
     dns = {
-      (local.dns_location) = coalesce(local.settings.dns.config.resource_group_name,
-      "${local.resource_prefix}-dns${local.resource_suffix}")
+      (local.dns_location) = {
+        name = coalesce(local.settings.dns.config.resource_group_name, "${local.resource_prefix}-dns${local.resource_suffix}")
+        tags = coalesce(hub.config.resource_group_tag, local.tags)
+      }
     }
+  }
+  resource_group_names_by_scope_and_location = {
+    for location, rg in local.hub_networks_by_location_p1 :
+    location => rg.name
   }
   # Generate a map of settings for each Resource Group per scope and location
   resource_group_config_by_scope_and_location = {
-    for scope, resource_groups in local.resource_group_names_by_scope_and_location :
+    for scope, resource_groups in local.resource_group_names_by_scope_and_location_p1 :
     scope => {
-      for location, name in resource_groups :
+      for location, rg in resource_groups :
       location => {
         # Resource logic attributes
-        resource_id = "/subscriptions/${local.subscription_id}/resourceGroups/${name}"
+        resource_id = "/subscriptions/${local.subscription_id}/resourceGroups/${rg.name}"
         scope       = scope
         # Resource definition attributes
-        name     = name
+        name     = rg.name
         location = location
-        tags     = try(local.custom_settings.azurerm_resource_group[scope][location].tags, local.tags)
+        tags     = rg.tags
       }
     }
   }
